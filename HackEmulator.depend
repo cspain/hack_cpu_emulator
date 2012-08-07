@@ -1,0 +1,9 @@
+# depslib dependency file v1.0
+1344299355 source:c:\users\chris2.chris-hp-select\documents\github\hack_cpu_emulator\src\loadrom.c
+	<stdio.h>
+	<stdlib.h>
+
+1344301302 source:c:\users\chris2.chris-hp-select\documents\github\hack_cpu_emulator\src\cpu.c
+	<stdio.h>
+	<string.h>
+
