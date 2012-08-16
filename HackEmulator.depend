@@ -3,7 +3,10 @@
 	<stdio.h>
 	<stdlib.h>
 
-1344301302 source:c:\users\chris2.chris-hp-select\documents\github\hack_cpu_emulator\src\cpu.c
+1345146882 source:c:\users\chris2.chris-hp-select\documents\github\hack_cpu_emulator\src\cpu.c
 	<stdio.h>
 	<string.h>
+	"hack_instruction_set.h"
+
+1345147490 c:\users\chris2.chris-hp-select\documents\github\hack_cpu_emulator\src\hack_instruction_set.h
 

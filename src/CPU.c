@@ -10,6 +10,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "hack_instruction_set.h"
+
 #if (DEBUG > 0)
 #define DBG(_fmt_, ...) printf(_fmt_,## __VA_ARGS__)
 #else
@@ -45,6 +47,7 @@ unsigned char RAM[0xFFFF] = {0x02, 0xE3, 0x6, 0x5, 0x21, 0xFF, 0x9F, 0x32, 0xCB,
                              0xF5, 0x06, 0x19, 0x78, 0x86, 0x23, 0x05, 0x20, 0xFB, 0x86, 0x20, 0xFE, 0x3E, 0x01, 0xE0, 0x50
                             };
 */
+
 
 #define ROM_END 0x7FF
 #define RAM_START ROM_END + 1
@@ -1252,210 +1255,6 @@ void MOV_AMD_DorM()
 */
 
 
-/* Note: when we use this we need to memcpy it over to cpu.map */
-void (*opList[])() =
-{
-
-   LOAD_A,                  //:A = number
-   SET_M_zero,              //:M = 0
-   SET_M_one,               //:M = 1
-   SET_M_negOne,            //:M = -1
-   MOV_M_D,                 //:M = D
-   MOV_M_A,                 //:M = A
-   MOV_M_notD,              //:M = !D
-   MOV_M_notA,              //:M = !A
-   MOV_M_negD,              //:M = -D
-   MOV_M_negA,              //:M = -A
-   MOV_M_incD,              //:M = D + 1
-   MOV_M_incA,              //:M = A + 1
-   MOV_M_decD,              //:M = D - 1
-   MOV_M_decA,              //:M = A-1
-   MOV_M_DaddA,             //:M = D + A
-   MOV_M_DsubA,             //:M = D - A
-   MOV_M_AsubD,             //:M = A - D
-   MOV_M_DandA,             //:M = D & A
-   MOV_M_DorA,              //:M = D | A
-   IDT_M,                   //:M = M
-   INV_M,                   //:M = !M
-   NEG_M,                   //:M = -M
-   INC_M,                   //:M = M+1
-   DEC_M,                   //:M = M-1
-   MOV_M_DaddM,             //:M = D+M
-   MOV_M_DsubM,             //:M = D-M
-   SUB_M_D,                 //:M = M-D
-   MOV_M_DandM,             //:M = D&M
-   MOV_M_DorM,              //:M = D|M
-   SET_D_zero,              //:D = 0
-   SET_D_one,               //:D = 1
-   SET_D_negOne,            //:D = -1
-   IDT_D,                   //:D = D
-   MOV_D_A,                 //:D = A
-   INV_D,                   //:D = !D
-   MOV_D_notA,              //:D = !A
-   NEG_D,                   //:D = -D
-   MOV_D_negA,              //:D = -A
-   INC_D,                   //:D = D + 1
-   MOV_D_incA,              //:D = A + 1
-   DEC_D,                   //:D = D - 1
-   MOV_D_decA,              //:D = A-1
-   ADD_D_A,                 //:D = D + A
-   SUB_D_A,                 //:D = D - A
-   MOV_D_AsubD,             //:D = A - D
-   AND_D_A,                 //:D = D & A
-   OR_D_A,                  //:D = D | A
-   MOV_D_M,                 //:D = M
-   MOV_D_notM,              //:D = !M
-   MOV_D_negM,              //:D = -M
-   MOV_D_incM,              //:D = M+1
-   MOV_D_decM,              //:D = M-1
-   ADD_D_M,                 //:D = D+M
-   SUB_D_M,                 //:D = D-M
-   MOV_D_MsubD,             //:D = M-D
-   AND_D_M,                 //:D = D&M
-   OR_D_M,                  //:D = D|M
-   SET_MD_zero,             //:MD = 0
-   SET_MD_one,              //:MD = 1
-   SET_MD_negOne,           //:MD = -1
-   MOV_MD_D,                //:MD = D
-   MOV_MD_A,                //:MD = A
-   MOV_MD_notD,             //:MD = !D
-   MOV_MD_notA,             //:MD = !A
-   MOV_MD_negD,             //:MD = -D
-   MOV_MD_negA,             //:MD = -A
-   MOV_MD_incD,             //:MD = D + 1
-   MOV_MD_incA,             //:MD = A + 1
-   MOV_MD_decD,             //:MD = D - 1
-   MOV_MD_decA,             //:MD = A-1
-   MOV_MD_DaddA,            //:MD = D + A
-   MOV_MD_DsubA,            //:MD = D - A
-   MOV_MD_AsubD,            //:MD = A - D
-   MOV_MD_DandA,            //:MD = D & A
-   MOV_MD_DorA,             //:MD = D | A
-   MOV_MD_M,                //:MD = M
-   MOV_MD_notM,             //:MD = !M
-   MOV_MD_negM,             //:MD = -M
-   MOV_MD_incM,             //:MD = M+1
-   MOV_MD_decM,             //:MD = M-1
-   MOV_MD_DaddM,            //:MD = D+M
-   MOV_MD_DsubM,            //:MD = D-M
-   MOV_MD_MsubD,            //:MD = M-D
-   MOV_MD_DandM,            //:MD = D&M
-   MOV_MD_DorM,             //:MD = D|M
-   SET_A_zero,              //:A = 0
-   SET_A_one,               //:A = 1
-   SET_A_negOne,            //:A = -1
-   MOV_A_D,                 //:A = D
-   IDT_A,                   //:A = A
-   MOV_A_notD,              //:A = !D
-   NOT_A,                   //:A = !A
-   MOV_A_negD,              //:A = -D
-   NEG_A,                   //:A = -A
-   MOV_A_incD,              //:A = D + 1
-   INC_A,                   //:A = A + 1
-   MOV_A_decD,             //:A = D - 1
-   DEC_A,                   //:A = A-1
-   MOV_A_DaddA,             //:A = D + A
-   MOV_A_DsubA,             //:A = D - A
-   SUB_A_D,                 //:A = A - D
-   MOV_A_DandA,             //:A = D & A
-   MOV_A_DorA,              //:A = D | A
-   MOV_A_M,                 //:A = M
-   MOV_A_notM,              //:A = !M
-   MOV_A_negM,              //:A = -M
-   MOV_A_incM,              //:A = M+1
-   MOV_A_decM,              //:A = M-1
-   MOV_A_DaddM,             //:A = D+M
-   MOV_A_DsubM,             //:A = D-M
-   MOV_A_MsuD,              //:A = M-D
-   MOV_A_DandM,             //:A = D&M
-   MOV_A_DorM,              //:A = D|M
-   SET_AM_zero,             //:AM = 0
-   SET_AM_one,              //:AM = 1
-   SET_AM_negOne,           //:AM = -1
-   MOV_AM_D,                //:AM = D
-   MOV_AM_A,                //:AM = A
-   MOV_AM_notD,             //:AM = !D
-   MOV_AM_notA,             //:AM = !A
-   MOV_AM_negD,             //:AM = -D
-   MOV_AM_negA,             //:AM = -A
-   MOV_AM_incD,             //:AM = D + 1
-   MOV_AM_incA,             //:AM = A + 1
-   MOV_AM_decD,             //:AM = D - 1
-   MOV_AM_decA,             //:AM = A-1
-   MOV_AM_DaddA,            //:AM = D + A
-   MOV_AM_DsubA,            //:AM = D - A
-   MOV_AM_AsubD,            //:AM = A - D
-   MOV_AM_DandA,            //:AM = D & A
-   MOV_AM_DorA,             //:AM = D | A
-   MOV_AM_M,                //:AM = M
-   MOV_AM_notM,             //:AM = !M
-   MOV_AM_negM,             //:AM = -M
-   MOV_AM_incM,             //:AM = M+1
-   MOV_AM_decM,             //:AM = M-1
-   MOV_AM_DaddM,            //:AM = D+M
-   MOV_AM_DnegM,            //:AM = D-M
-   MOV_AM_MsubD,            //:AM = M-D
-   MOV_AM_DandM,            //:AM = D&M
-   MOV_AM_DorM,             //:AM = D|M
-   SET_AD_zero,             //:AD = 0
-   SET_AD_one,              //:AD = 1
-   SET_AD_negOne,           //:AD = -1
-   MOV_AD_D,                //:AD = D
-   MOV_AD_A,                //:AD = A
-   MOV_AD_notD,             //:AD = !D
-   MOV_AD_notA,             //:AD = !A
-   MOV_AD_negD,             //:AD = -D
-   MOV_AD_negA,             //:AD = -A
-   MOV_AD_incD,             //:AD = D + 1
-   MOV_AD_incA,             //:AD = A + 1
-   MOV_AD_decD,             //:AD = D - 1
-   MOV_AD_decA,             //:AD = A-1
-   MOV_AD_DaddA,            //:AD = D + A
-   MOV_AD_DsubA,            //:AD = D - A
-   MOV_AD_AsubD,            //:AD = A - D
-   MOV_AD_DandA,            //:AD = D & A
-   MOV_AD_DorA,             //:AD = D | A
-   MOV_AD_M,                //:AD = M
-   MOV_AD_notM,             //:AD = !M
-   MOV_AD_negM,             //:AD = -M
-   MOV_AD_incM,             //:AD = M+1
-   MOV_AD_decM,             //:AD = M-1
-   MOV_AD_DaddM,            //:AD = D+M
-   MOV_AD_DsubM,            //:AD = D-M
-   MOV_AD_MsubD,            //:AD = M-D
-   MOV_AD_DandM,            //:AD = D&M
-   MOV_AD_DorM,             //:AD = D|M
-   SET_AMD_zero,            //:AMD = 0
-   SET_AMD_one,             //:AMD = 1
-   SET_AMD_negOne,          //:AMD = -1
-   MOV_AMD_D,               //:AMD = D
-   MOV_AMD_A,               //:AMD = A
-   MOV_AMD_notD,            //:AMD = !D
-   MOV_AMD_notA,            //:AMD = !A
-   MOV_AND_negD,            //:AMD = -D
-   MOV_AMD_negA,            //:AMD = -A
-   MOV_AMD_incD,            //:AMD = D + 1
-   MOV_AMD_incA,            //:AMD = A + 1
-   MOV_AMD_decD,            //:AMD = D - 1
-   MOV_AMD_decA,            //:AMD = A-1
-   MOV_AMD_DaddA,           //:AMD = D + A
-   MOV_AMD_DsubA,           //:AMD = D - A
-   MOV_AMD_AsubD,           //:AMD = A - D
-   MOV_AMD_DandA,           //:AMD = D & A
-   MOV_AMD_DorA,            //:AMD = D | A
-   MOV_AMD_M,               //:AMD = M
-   MOV_AMD_notM,            //:AMD = !M
-   MOV_AMD_negM,            //:AMD = -M
-   MOV_AMD_incM,            //:AMD = M+1
-   MOV_AMD_decM,            //:AMD = M-1
-   MOV_AMD_DaddM,           //:AMD = D+M
-   MOV_AMD_DsubM,           //:AMD = D-M
-   MOV_AMD_MsubD,           //:AMD = M-D
-   MOV_AMD_DandM,           //:AMD = D&M
-   MOV_AMD_DorM,            //:AMD = D|M
-
-}; //end op code map of function pointers
-
 
 
 /*
@@ -1502,7 +1301,7 @@ void execute(void)
    unsigned char instructionShift = 15;  // location of bit that determines if A or C instruction
    unsigned char jumpBits = 0; // What the jump instruction is
    unsigned int out; // Value of the destination register
-   unsigned int destCode; // Which register are we writing to
+   unsigned int destCode, destBits; // Which register are we writing to
 
    /* The entire opcode should map to a function */
 
@@ -1516,13 +1315,16 @@ void execute(void)
    {
       /* if bit15 is 1 then we have a C instruction */
       DBG("------->opcode before swizzle %x\n",opcode);
-      opcode &= 0x3FFF; //mask to 13 bits
+      opcode &= 0x1FFF; //mask to 13 bits
       DBG("---opcode after mask to 13 %x\n",opcode);
       jumpBits = opcode & 0x07; // get jump bits for later
-      opcode = opcode >> 3; // cut jump bits
+      opcode = (opcode >> 3) & 0x3FF; // cut jump bits - should now be down to 10 bits
+      destBits = opcode & 0x07; // get destination bits for later
+      opcode = (opcode >> 3) & 0x3FF; // cut destination bits - should now be down to 7 bits
+      DBG("------->opcode after shift3 %x\n",opcode);
       /* Need to add offset as not every opcode is used */
       opcode -= OPCODE_OFFSET;
-      DBG("------->opcode after shift3 %x\n",opcode);
+     // DBG("------->opcode after shift3 %x\n",opcode);
    }
    else
    {
