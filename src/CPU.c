@@ -5,12 +5,12 @@
 
 #define DEBUG 1
 #define DEBUG_REGS 1
-#define OPCODE_OFFSET 0x0561 // not all opcodes are used so we need an offset into the valid ones
+#define OPCODE_OFFSET 0x0 // not all opcodes are used so we need an offset into the valid ones
 
 #include <stdio.h>
 #include <string.h>
 
-#include "hack_instruction_set.h"
+#include "src/hack_instruction_set.h"
 
 #if (DEBUG > 0)
 #define DBG(_fmt_, ...) printf(_fmt_,## __VA_ARGS__)
@@ -249,6 +249,17 @@ void initMMU(void)
 
 
 // put these in an array of function pointers, then opcode 0x8 will call op[8] which will be the correct function for that opcode
+
+
+void NOP()
+{
+   /* Does not do anything, though we should update the timer here when implemented */
+   int a = 0;
+   if (a) {
+      a = 0;
+   }
+
+}
 
 void LOAD_A()
 {
@@ -1306,7 +1317,7 @@ void execute(void)
    /* The entire opcode should map to a function */
 
    /* Get the instruction from the ROM */
-   int opcode = MMU.rw(cpu._r.pc);
+   unsigned int opcode = MMU.rw(cpu._r.pc);
 
    /* need to decode A vs C instructions...not sure if this is the best place
       TODO: write an Instruction Decoder function
@@ -1314,16 +1325,16 @@ void execute(void)
    if ( opcode & (1 << instructionShift) )
    {
       /* if bit15 is 1 then we have a C instruction */
-      DBG("------->opcode before swizzle %x\n",opcode);
+      DBG("------->C INST opcode before swizzle %x\n",opcode);
       opcode &= 0x1FFF; //mask to 13 bits
       DBG("---opcode after mask to 13 %x\n",opcode);
       jumpBits = opcode & 0x07; // get jump bits for later
       opcode = (opcode >> 3) & 0x3FF; // cut jump bits - should now be down to 10 bits
-      destBits = opcode & 0x07; // get destination bits for later
-      opcode = (opcode >> 3) & 0x3FF; // cut destination bits - should now be down to 7 bits
-      DBG("------->opcode after shift3 %x\n",opcode);
+      //destBits = opcode & 0x07; // get destination bits for later
+      //opcode = (opcode >> 3) & 0x3FF; // cut destination bits - should now be down to 7 bits
+      DBG("------!!>opcode after shift3 %x\n",opcode);
       /* Need to add offset as not every opcode is used */
-      opcode -= OPCODE_OFFSET;
+      //opcode -= OPCODE_OFFSET;
      // DBG("------->opcode after shift3 %x\n",opcode);
    }
    else
@@ -1331,7 +1342,7 @@ void execute(void)
       opcode = 0x00;  // call A load instruction
    }
    /* ************ACTUALLY CALCULATE OUTPUT BY RUNNING CPU  ************** */
-   printf("Current Opcode %x\n", (unsigned)opcode);
+   printf("Current Opcode %x\n", opcode);
    printf("PC: %d\n",cpu._r.pc);
    DBG("****************executing instruction\n");
    /* Run the mapped function */
@@ -1446,7 +1457,7 @@ int main()
    int i = 0;
    int rc = 0;
 
-   printf("Loading Program ROM...\n");
+   printf("!!!!!!!!!Loading Program ROM...\n");
    rc = readHackFile(RAM);
    if (rc < 0)
    {
