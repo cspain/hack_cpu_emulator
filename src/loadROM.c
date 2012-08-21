@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define BIG_ENDIAN 1  // Store MSB at lowest address
 
@@ -8,7 +9,7 @@
 
 */
 
-
+int readHackFile(unsigned char *ROM);
 int binStr2Dec(char *binString, int nBits);
 
 
@@ -32,7 +33,6 @@ int test_main()
 int readHackFile(unsigned char *ROM)
 {
     int converted;
-    int num = 0;
     unsigned char highByte;
     unsigned char lowByte;
     char tempBuffer[50];
@@ -74,7 +74,7 @@ int readHackFile(unsigned char *ROM)
 
 int binStr2Dec(char *binString, int nBits)
 {
-    int *currentC;
+    char currentC;
     long sum = 0;
     long base = 0;
     int count = 0;
