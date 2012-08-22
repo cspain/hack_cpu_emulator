@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <assert.h>
 
 #define BIG_ENDIAN 1  // Store MSB at lowest address
 
@@ -78,6 +79,9 @@ int binStr2Dec(char *binString, int nBits)
     long sum = 0;
     long base = 0;
     int count = 0;
+
+    assert(binString != NULL);
+    assert((nBits < 64) && (nBits > 0));
 
     base = 2 << (nBits - 2);
 
