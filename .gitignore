@@ -28,6 +28,15 @@ local.properties
 # PDT-specific
 .buildpath
 
+#################
+## CODE::BLOCKS
+#################
+
+*.o
+*.exe
+*.layout
+*.gs5.txt
+
 
 #################
 ## Visual Studio

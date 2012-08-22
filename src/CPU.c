@@ -1107,7 +1107,7 @@ void MOV_AMD_notA()
    cpu._r.d = out;
    cpu._r.a = out;
 }
-void MOV_AND_negD()
+void MOV_AMD_negD()
 {
    int out = -cpu._r.d;    //:AMD = -D
    MMU.ww(cpu._r.a, out);

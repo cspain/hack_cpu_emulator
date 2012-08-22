@@ -1,12 +1,15 @@
 # depslib dependency file v1.0
-1344299355 source:c:\users\chris2.chris-hp-select\documents\github\hack_cpu_emulator\src\loadrom.c
+1345508231 source:c:\users\chris2.chris-hp-select\documents\github\hack_cpu_emulator\src\loadrom.c
 	<stdio.h>
 	<stdlib.h>
+	<string.h>
 
-1345146882 source:c:\users\chris2.chris-hp-select\documents\github\hack_cpu_emulator\src\cpu.c
+1345598824 source:c:\users\chris2.chris-hp-select\documents\github\hack_cpu_emulator\src\cpu.c
 	<stdio.h>
 	<string.h>
-	"hack_instruction_set.h"
+	"src/hack_instruction_set.h"
 
 1345147490 c:\users\chris2.chris-hp-select\documents\github\hack_cpu_emulator\src\hack_instruction_set.h
+
+1345598827 c:\users\chris2.chris-hp-select\documents\github\hack_cpu_emulator\\src\hack_instruction_set.h
 
