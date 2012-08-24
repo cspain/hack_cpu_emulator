@@ -6,13 +6,14 @@
 #define DEBUG 1
 #define DEBUG_REGS 1
 #define OPCODE_OFFSET 0x0 // not all opcodes are used so we need an offset into the valid ones
-#define NUM_EXEC 6
+#define MAX_OP 0x400 + 0xFF// Number of possible opcodes
+#define NUM_EXEC 65535
 
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
 
-#include "src/hack_instruction_set.h"
+#include "hack_instruction_set.h"
 
 #if (DEBUG > 0)
 #define DBG(_fmt_, ...) printf(_fmt_,## __VA_ARGS__)
@@ -74,7 +75,7 @@ IDEA: May be better in the multiple reg updates to have temp = A op B; A = B = t
 
 struct registers
 {
-   int
+   unsigned int
    a,   // address register
    d,   // data register
    sp,  // stack pointer
@@ -100,7 +101,7 @@ struct cpu_s
    //struct operations _ops;                  // Operations functions
    int _clock;                                // Timing details
    void (*reset)(void);                       // Reset function
-   void (*map[512])(void);                    // Array of function pointers to operations - organized by opcode
+   void (*map[MAX_OP])(void);                    // Array of function pointers to operations - organized by opcode
    void (*execute)(void);                     // Execute the next instruction pointed to by the program counter pc
 
 } cpu; // now have a global cpu object
@@ -214,7 +215,7 @@ int readWord (int address)
 {
    unsigned char byteHigh;
    unsigned char byteLow;
-   int combined;
+   unsigned int combined;
    DBG("reading word at address %d\n",address);
    byteHigh = readByte(address);
    byteLow = readByte(address + 1);
@@ -260,6 +261,7 @@ void initMMU(void)
 void NOP()
 {
    /* Does not do anything, though we should update the timer here when implemented */
+  DBG("NOP NOP NOP NOP\n");
    int a = 0;
    if (a) {
       a = 0;
@@ -1351,10 +1353,15 @@ void execute(void)
    printf("Current Opcode %x\n", opcode);
    printf("PC: %d\n",cpu._r.pc);
    DBG("****************executing instruction\n");
+   DBG("SIZEOF CPU MAP %d, contents of [0x300] %x, of [0x8] %x [0xA] %x\n",sizeof(cpu.map), cpu.map[0x300], cpu.map[0x8], cpu.map[0xA]);
+
    /* Run the mapped function */
    (*cpu.map[opcode])();
    DBG("****************DONE*************\n");
    /* ******************************************************************** */
+
+   cpu._r.pc += 2; // Update Program Counter here
+
    if (jumpBits)
    {
       /* Get the destination bits so we can determine
@@ -1391,6 +1398,8 @@ void execute(void)
          printf("execute: ERROR: INVALID JUMP BITS\n");
       }
 
+   cpu._r.pc += 2; // Update Program Counter here - can be overriden by jump
+
       /* Now we know which register to look at for the compare, we can see where to jump */
       switch (jumpBits)
       {
@@ -1400,41 +1409,48 @@ void execute(void)
          if (out > 0)
          {
             cpu._r.pc = cpu._r.a;    // Program Counter set to Address register value for jump
+            DBG("JUMPING > 0, A is %d\n", cpu._r.a);
          }
          break;
       case 2:
          if (out == 0)
          {
             cpu._r.pc = cpu._r.a;
+             DBG("JUMPING == 0, A is %d\n", cpu._r.a);
          }
          break;
       case 3:
          if (out >= 0)
          {
             cpu._r.pc = cpu._r.a;
+            DBG("JUMPING >= 0, A is %d\n", cpu._r.a);
          }
          break;
       case 4:
          if (out < 0)
          {
             cpu._r.pc = cpu._r.a;
+            DBG("JUMPING < 0, A is %d\n", cpu._r.a);
          }
          break;
       case 5:
          if (out != 0)
          {
             cpu._r.pc = cpu._r.a;
+            DBG("JUMPING != 0, A is %d\n", cpu._r.a);
          }
          break;
       case 6:
          if (out <= 0)
          {
+            DBG("JUMPING <= 0, A is %d\n", cpu._r.a);
             cpu._r.pc = cpu._r.a;
          }
          break;
       case 7:
          if (1)
          {
+            DBG("JUMPING ALWAYS, A is %d\n", cpu._r.a);
             cpu._r.pc = cpu._r.a;    // Always jump
          }
          break;
@@ -1444,7 +1460,7 @@ void execute(void)
       }
 
    }
-   cpu._r.pc += 2;
+
 }
 
 
@@ -1484,6 +1500,7 @@ int main()
    for(i=0; i< NUM_EXEC; i++)
    {
       cpu.execute();
+      printf("-----------------cycle: %d -------------\n",i);
    }
 
    printf("---------------->cpu._r.d = %d\n",cpu._r.d);
