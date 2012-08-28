@@ -9,6 +9,12 @@
 #define MAX_OP 0x400 + 0xFF// Number of possible opcodes
 #define NUM_EXEC 65535
 
+#define F_ZERO       (1 << 0)
+#define F_CARRY      (1 << 1)
+#define F_SIGN       (1 << 2)
+#define F_OVERFLOW   (1 << 3)
+#define F_PARITY     (1 << 4)
+
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -29,6 +35,8 @@
 #endif
 
 void execute(void);
+extern int readHackFile(unsigned char *ROM);
+
 //extern int readHackFile(unsigned *char ROM);
 unsigned char RAM[0xFFFF];
 //char RAM[0xFFFF ] = {0};
@@ -82,6 +90,9 @@ struct registers
    pc,  // program counter         i,
    ms,   // time taken for last instruction
    t;   // total time CPU has run
+
+   unsigned char st;  // status register - (0)Z-ero, (1)C-arry, (2)S-ign, (3)O-verflow, (4)P-arity
+
 };
 
 /******************************************************
@@ -136,8 +147,8 @@ struct cpu_s
 
 struct MMU_s
 {
-   void (*wb) (int address, char value);    // Write byte
-   void (*ww) (int address, int value);     // Write word
+   void (*wb) (unsigned int address, unsigned char value);    // Write byte
+   void (*ww) (unsigned int address, unsigned int value);     // Write word
 
    char (*rb) (int address);                // Read byte
    int (*rw) (int address);                 // Read word
@@ -277,14 +288,20 @@ void LOAD_A()
 void SET_M_zero()
 {
    MMU.ww(cpu._r.a, 0);    //:M = 0
+   cpu._r.st |= F_ZERO;    // Set Z
+
 }
 void SET_M_one()
 {
    MMU.ww(cpu._r.a, 1);    //:M = 1
+   cpu._r.st &= ~F_ZERO;   // Clear Z
+
 }
 void SET_M_negOne()
 {
    MMU.ww(cpu._r.a, -1);    //:M = -1
+   cpu._r.st &= ~F_ZERO;   // Clear Z
+   cpu._r.st |= F_SIGN;   // Set S
 }
 void MOV_M_D()
 {
@@ -390,14 +407,18 @@ void MOV_M_DorM()
 void SET_D_zero()
 {
    cpu._r.d = 0;    //:D = 0
+   cpu._r.st |= F_ZERO;
+
 }
 void SET_D_one()
 {
    cpu._r.d = 1;    //:D = 1
+   cpu._r.st &= ~F_ZERO;
 }
 void SET_D_negOne()
 {
    cpu._r.d = -1;    //:D = -1
+   cpu._r.st |= F_SIGN;
 }
 void IDT_D()
 {
@@ -427,30 +448,45 @@ void MOV_D_negA()
 void INC_D()
 {
    cpu._r.d++;    //:D = D + 1
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
+
 }
 void MOV_D_incA()
 {
    cpu._r.d = cpu._r.a + 1;    //:D = A + 1
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void DEC_D()
 {
    cpu._r.d--;    //:D = D - 1
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_D_decA()
 {
    cpu._r.d = cpu._r.a - 1;    //:D = A-1
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void ADD_D_A()
 {
    cpu._r.d += cpu._r.a;    //:D = D + A
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void SUB_D_A()
 {
    cpu._r.d -= cpu._r.a;    //:D = D - A
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_D_AsubD()
 {
    cpu._r.d = cpu._r.a - cpu._r.a;    //:D = A - D
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void AND_D_A()
 {
@@ -463,6 +499,8 @@ void OR_D_A()
 void MOV_D_M()
 {
    cpu._r.d  = MMU.rw(cpu._r.a);    //:D = M
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_D_notM()
 {
@@ -471,26 +509,38 @@ void MOV_D_notM()
 void MOV_D_negM()
 {
    cpu._r.d = -MMU.rw(cpu._r.a);    //:D = -M
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_D_incM()
 {
    cpu._r.d  = MMU.rw(cpu._r.a) + 1;    //:D = M+1
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_D_decM()
 {
    cpu._r.d  = MMU.rw(cpu._r.a) - 1;    //:D = M-1
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void ADD_D_M()
 {
    cpu._r.d += MMU.rw(cpu._r.a);    //:D = D+M
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void SUB_D_M()
 {
    cpu._r.d -= MMU.rw(cpu._r.a);    //:D = D-M
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_D_MsubD()
 {
    cpu._r.d  = MMU.rw(cpu._r.a) - cpu._r.d;    //:D = M-D
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void AND_D_M()
 {
@@ -505,31 +555,43 @@ void SET_MD_zero()
 {
    MMU.ww(cpu._r.a, 0);    //:MD = 0
    cpu._r.d = 0;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void SET_MD_one()
 {
    MMU.ww(cpu._r.a, 1);    //:MD = 1
    cpu._r.d = 1;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void SET_MD_negOne()
 {
    MMU.ww(cpu._r.a, -1);    //:MD = -1
    cpu._r.d = -1;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_MD_D()
 {
    MMU.ww(cpu._r.a, cpu._r.d) ;    //:MD = D
    cpu._r.d = cpu._r.d;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_MD_A()
 {
    MMU.ww(cpu._r.a, cpu._r.a);    //:MD = A
    cpu._r.d = cpu._r.a;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_MD_notD()
 {
    MMU.ww(cpu._r.a, !cpu._r.d);    //:MD = !D
-   cpu._r.d != cpu._r.d;
+   cpu._r.d = !cpu._r.d;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_MD_notA()
 {
@@ -540,51 +602,71 @@ void MOV_MD_negD()
 {
    MMU.ww(cpu._r.a, -cpu._r.d);    //:MD = -D
    cpu._r.d = -cpu._r.d;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_MD_negA()
 {
    MMU.ww(cpu._r.a, -cpu._r.a);    //:MD = -A
    cpu._r.d = -cpu._r.a;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_MD_incD()
 {
    MMU.ww(cpu._r.a, cpu._r.d + 1);    //:MD = D + 1
    cpu._r.d++;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_MD_incA()
 {
    MMU.ww(cpu._r.a, cpu._r.a + 1);    //:MD = A + 1
    cpu._r.d = cpu._r.a + 1;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_MD_decD()
 {
    MMU.ww(cpu._r.a, cpu._r.d - 1);    //:MD = D - 1
    cpu._r.d--;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_MD_decA()
 {
    MMU.ww(cpu._r.a, cpu._r.a - 1);    //:MD = A-1
    cpu._r.d = cpu._r.a - 1;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_MD_DaddA()
 {
    MMU.ww(cpu._r.a, cpu._r.d + cpu._r.a);    //:MD = D + A
    cpu._r.d += cpu._r.a;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_MD_DsubA()
 {
    MMU.ww(cpu._r.a, cpu._r.d - cpu._r.a);    //:MD = D - A
    cpu._r.d -= cpu._r.a;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_MD_AsubD()
 {
    MMU.ww(cpu._r.a, cpu._r.a - cpu._r.d);    //:MD = A - D
    cpu._r.d = cpu._r.a - cpu._r.d;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_MD_DandA()
 {
    MMU.ww(cpu._r.a, cpu._r.d & cpu._r.a);    //:MD = D & A
    cpu._r.d &= cpu._r.a;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_MD_DorA()
 {
@@ -595,6 +677,8 @@ void MOV_MD_M()
 {
    MMU.ww(cpu._r.a, MMU.rw(cpu._r.a));    //:MD = M
    cpu._r.d  = MMU.rw(cpu._r.a);
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_MD_notM()
 {
@@ -605,46 +689,62 @@ void MOV_MD_negM()
 {
    cpu._r.d = -MMU.rw(cpu._r.a);    //*:MD = -M
    MMU.ww(cpu._r.a, -MMU.rw(cpu._r.a));
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_MD_incM()
 {
    cpu._r.d  = MMU.rw(cpu._r.a) + 1;    //:*MD = M+1
    MMU.ww(cpu._r.a, MMU.rw(cpu._r.a) + 1);
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_MD_decM()
 {
    cpu._r.d  = MMU.rw(cpu._r.a) - 1;    //:*MD = M-1
    MMU.ww(cpu._r.a, MMU.rw(cpu._r.a) - 1);
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_MD_DaddM()
 {
    int out = cpu._r.d + MMU.rw(cpu._r.a);    //*:MD = D+M
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_MD_DsubM()
 {
    int out = cpu._r.d - MMU.rw(cpu._r.a);    //*:MD = D-M
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_MD_MsubD()
 {
    int out  = MMU.rw(cpu._r.a) - cpu._r.d;    //*:MD = M-D
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_MD_DandM()
 {
    int out = cpu._r.d & MMU.rw(cpu._r.a);    //:*MD = D&M
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_MD_DorM()
 {
    int out  = cpu._r.d | MMU.rw(cpu._r.a);    //:MD = D|M
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 
 void SET_A_zero()
@@ -928,31 +1028,42 @@ void SET_AD_zero()
 {
    cpu._r.a = 0;    //:AD = 0
    cpu._r.d = 0;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void SET_AD_one()
 {
    cpu._r.a = 1;    //:AD = 1
    cpu._r.d = 1;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void SET_AD_negOne()
 {
    cpu._r.a = -1;    //:AD = -1
    cpu._r.d = 1;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AD_D()
 {
    cpu._r.a = cpu._r.d;    //:AD = D
    cpu._r.d = cpu._r.d;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AD_A()
 {
    cpu._r.a = cpu._r.a;    //:AD = A
    cpu._r.d = cpu._r.d;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AD_notD()
 {
    cpu._r.d = !cpu._r.d;    //*:AD = !D
    cpu._r.a = !cpu._r.d;
+
 }
 void MOV_AD_notA()
 {
@@ -963,51 +1074,70 @@ void MOV_AD_negD()
 {
    cpu._r.a = -cpu._r.d;    //:AD = -D
    cpu._r.d = -cpu._r.d;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AD_negA()
 {
    cpu._r.d = -cpu._r.a;    //*:AD = -A
    cpu._r.a = -cpu._r.a;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AD_incD()
 {
    cpu._r.a = cpu._r.d + 1;    //:AD = D + 1
    cpu._r.d = cpu._r.d + 1;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AD_incA()
 {
    cpu._r.d = cpu._r.a + 1;    //*:AD = A + 1
    cpu._r.a = cpu._r.a + 1;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AD_decD()
 {
    cpu._r.a = cpu._r.d - 1;    //:AD = D - 1
    cpu._r.d = cpu._r.d - 1;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AD_decA()
 {
    cpu._r.d = cpu._r.a - 1;    //*:AD = A-1
    cpu._r.a = cpu._r.a - 1;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AD_DaddA()
 {
    int out = cpu._r.d + cpu._r.a;    //*:AD = D + A
    cpu._r.a = cpu._r.d = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AD_DsubA()
 {
    int out = cpu._r.d - cpu._r.a;    //*:AD = D - A
    cpu._r.a = cpu._r.d = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AD_AsubD()
 {
    int out = cpu._r.a - cpu._r.d;    //*:AD = A - D
    cpu._r.a = cpu._r.d = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AD_DandA()
 {
    int out = cpu._r.d & cpu._r.a;    //*:AD = D & A
    cpu._r.a = cpu._r.d = out;
+
 }
 void MOV_AD_DorA()
 {
@@ -1018,6 +1148,8 @@ void MOV_AD_M()
 {
    cpu._r.a = MMU.rw(cpu._r.a);    //:AD = M
    cpu._r.d  = MMU.rw(cpu._r.a);
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AD_notM()
 {
@@ -1028,31 +1160,43 @@ void MOV_AD_negM()
 {
    cpu._r.a = -MMU.rw(cpu._r.a);    //:AD = -M
    cpu._r.d = -MMU.rw(cpu._r.a);
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AD_incM()
 {
    cpu._r.a  = MMU.rw(cpu._r.a) + 1;    //:AD = M+1
    cpu._r.d  = MMU.rw(cpu._r.a) + 1;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AD_decM()
 {
    cpu._r.a  = MMU.rw(cpu._r.a) - 1;    //:AD = M-1
    cpu._r.d  = MMU.rw(cpu._r.a) - 1;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AD_DaddM()
 {
    cpu._r.a = cpu._r.d + MMU.rw(cpu._r.a);    //:AD = D+M
    cpu._r.d = cpu._r.d + MMU.rw(cpu._r.a);
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AD_DsubM()
 {
    cpu._r.a = cpu._r.d - MMU.rw(cpu._r.a);    //:AD = D-M
    cpu._r.d = cpu._r.d - MMU.rw(cpu._r.a);
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AD_MsubD()
 {
    cpu._r.a  = MMU.rw(cpu._r.a) - cpu._r.d;    //:AD = M-D
    cpu._r.d  = MMU.rw(cpu._r.a) - cpu._r.d;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AD_DandM()
 {
@@ -1071,6 +1215,8 @@ void SET_AMD_zero()
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
    cpu._r.a = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void SET_AMD_one()
 {
@@ -1078,6 +1224,8 @@ void SET_AMD_one()
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
    cpu._r.a = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void SET_AMD_negOne()
 {
@@ -1085,6 +1233,8 @@ void SET_AMD_negOne()
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
    cpu._r.a = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AMD_D()
 {
@@ -1092,6 +1242,8 @@ void MOV_AMD_D()
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
    cpu._r.a = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AMD_A()
 {
@@ -1099,6 +1251,8 @@ void MOV_AMD_A()
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
    cpu._r.a = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AMD_notD()
 {
@@ -1120,6 +1274,8 @@ void MOV_AMD_negD()
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
    cpu._r.a = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AMD_negA()
 {
@@ -1127,6 +1283,8 @@ void MOV_AMD_negA()
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
    cpu._r.a = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AMD_incD()
 {
@@ -1134,6 +1292,8 @@ void MOV_AMD_incD()
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
    cpu._r.a = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AMD_incA()
 {
@@ -1141,6 +1301,8 @@ void MOV_AMD_incA()
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
    cpu._r.a = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AMD_decD()
 {
@@ -1148,6 +1310,8 @@ void MOV_AMD_decD()
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
    cpu._r.a = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AMD_decA()
 {
@@ -1155,6 +1319,8 @@ void MOV_AMD_decA()
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
    cpu._r.a = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AMD_DaddA()
 {
@@ -1162,6 +1328,8 @@ void MOV_AMD_DaddA()
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
    cpu._r.a = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AMD_DsubA()
 {
@@ -1169,6 +1337,8 @@ void MOV_AMD_DsubA()
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
    cpu._r.a = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AMD_AsubD()
 {
@@ -1176,6 +1346,8 @@ void MOV_AMD_AsubD()
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
    cpu._r.a = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AMD_DandA()
 {
@@ -1183,6 +1355,7 @@ void MOV_AMD_DandA()
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
    cpu._r.a = out;
+
 }
 void MOV_AMD_DorA()
 {
@@ -1197,6 +1370,8 @@ void MOV_AMD_M()
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
    cpu._r.a = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AMD_notM()
 {
@@ -1211,6 +1386,8 @@ void MOV_AMD_negM()
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
    cpu._r.a = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AMD_incM()
 {
@@ -1218,6 +1395,8 @@ void MOV_AMD_incM()
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
    cpu._r.a = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AMD_decM()
 {
@@ -1225,6 +1404,8 @@ void MOV_AMD_decM()
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
    cpu._r.a = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AMD_DaddM()
 {
@@ -1232,6 +1413,8 @@ void MOV_AMD_DaddM()
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
    cpu._r.a = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AMD_DsubM()
 {
@@ -1239,6 +1422,8 @@ void MOV_AMD_DsubM()
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
    cpu._r.a = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AMD_MsubD()
 {
@@ -1246,6 +1431,8 @@ void MOV_AMD_MsubD()
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
    cpu._r.a = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AMD_DandM()
 {
@@ -1253,6 +1440,8 @@ void MOV_AMD_DandM()
    MMU.ww(cpu._r.a, out);
    cpu._r.d = out;
    cpu._r.a = out;
+   (cpu._r.d == 0) ? (cpu._r.st |= F_ZERO) : (cpu._r.st &= ~F_ZERO);
+   (cpu._r.d < 0) ? (cpu._r.st |= F_SIGN) : (cpu._r.st &= ~F_SIGN);
 }
 void MOV_AMD_DorM()
 {
@@ -1320,7 +1509,7 @@ void execute(void)
    unsigned char instructionShift = 15;  // location of bit that determines if A or C instruction
    unsigned char jumpBits = 0; // What the jump instruction is
    unsigned int out; // Value of the destination register
-   unsigned int destCode, destBits; // Which register are we writing to
+   unsigned int destCode; // Which register are we writing to
 
    /* The entire opcode should map to a function */
 
