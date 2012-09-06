@@ -7,7 +7,12 @@
 #define DEBUG_REGS 1
 #define OPCODE_OFFSET 0x0 // not all opcodes are used so we need an offset into the valid ones
 #define MAX_OP 0x400 + 0xFF// Number of possible opcodes
-#define NUM_EXEC 65535
+#define NUM_EXEC 65535 // Limit the number of executions (only for debug)
+#define SCREEN 0x4000 // Screen mapped to this address
+#define SCREEN_SIZE 0x2000 // Size of screen map
+#define KBD 0x6000 // Keyboard mapped to this address
+
+#define DUMP_SCREEN_MEM 1//Turn on or off the screen memory dump
 
 #define F_ZERO       (1 << 0)
 #define F_CARRY      (1 << 1)
@@ -1689,6 +1694,11 @@ int main()
    for(i=0; i< NUM_EXEC; i++)
    {
       cpu.execute();
+      if (DUMP_SCREEN_MEM) {
+      rc = screenMemDump("screenDump.txt", RAM, SCREEN, SCREEN_SIZE);
+      }
+      if (rc < 0) {return -1;}
+
       printf("-----------------cycle: %d -------------\n",i);
    }
 

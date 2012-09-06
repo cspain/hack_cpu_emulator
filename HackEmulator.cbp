@@ -31,7 +31,14 @@
 		<Compiler>
 			<Add option="-Wall" />
 		</Compiler>
-		<Unit filename="main.c">
+		<Unit filename="src\CPU.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src\hack_instruction_set.h" />
+		<Unit filename="src\loadROM.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="src\storeScreenMem.c">
 			<Option compilerVar="CC" />
 		</Unit>
 		<Extensions>

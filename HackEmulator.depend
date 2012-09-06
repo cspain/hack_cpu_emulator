@@ -5,7 +5,7 @@
 	<string.h>
 	<assert.h>
 
-1346112352 source:c:\users\chris2.chris-hp-select\documents\github\hack_cpu_emulator\src\cpu.c
+1346710499 source:c:\users\chris2.chris-hp-select\documents\github\hack_cpu_emulator\src\cpu.c
 	<stdio.h>
 	<string.h>
 	<assert.h>
@@ -14,4 +14,7 @@
 1345601497 c:\users\chris2.chris-hp-select\documents\github\hack_cpu_emulator\src\hack_instruction_set.h
 
 1345601497 c:\users\chris2.chris-hp-select\documents\github\hack_cpu_emulator\\src\hack_instruction_set.h
+
+1346710477 source:c:\users\chris2.chris-hp-select\documents\github\hack_cpu_emulator\src\storescreenmem.c
+	<stdio.h>
 
