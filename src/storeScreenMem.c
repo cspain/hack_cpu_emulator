@@ -41,7 +41,7 @@ int screenMemDump(char *fileName, unsigned char *RAM, unsigned int screenStart, 
    {
 
       //printf("SCREEN %d\n",*(RAM+offset));
-      fprintf(fp,"%d",*(RAM+offset));
+      fprintf(fp,"%d\n",*(RAM+offset));
 
    }
    fclose(fp);
