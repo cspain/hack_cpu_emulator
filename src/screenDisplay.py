@@ -16,15 +16,17 @@ event management"""
 
 import random, math, pygame
 from pygame.locals import *
+from numpy  import *
+import time
 
 #constants
 WINSIZE = [512, 256]
 WINCENTER = [320, 240]
-NUMSTARS = 9900
+NUMPELS = 9900
 SCREEN_SIZE_BYTES = WINSIZE[0]*WINSIZE[1]/8
 SCREEN_WIDTH_PELS = WINSIZE[0]
-
-
+infile = open('C:\Users\Chris2.chris-HP-Select\Documents\GitHub\hack_cpu_emulator\screenDump.txt','r')
+SCREEN = zeros((256, 512))
 
 #############################
 # Read in n lines from a file
@@ -32,8 +34,12 @@ SCREEN_WIDTH_PELS = WINSIZE[0]
 def readNlines(numLines, fileToRead):
 	readInLines = []
 	for i in range(numLines):
-		value = int(fileToRead.readline())
-		readInLines.append(value)
+		value = fileToRead.readline()
+		if value == '':
+			print 'ERROR EOF? ' + str(i)
+			break
+		
+		readInLines.append(int(value))
 	
 	
 	return readInLines
@@ -61,7 +67,7 @@ def readNlines(numLines, fileToRead):
 ####################################### (1,31) = 0 and is in row 1, byte 3
 
 def getScreenVal(coord, screenData):
-	print "INSIDE getScreenVAL"
+	#print "INSIDE getScreenVAL"
 	#First get the row
 	row = coord[0]
 	#Now col
@@ -69,10 +75,10 @@ def getScreenVal(coord, screenData):
 	#Get the correct byte out
 	byteNum = (SCREEN_WIDTH_PELS * row + col)/8
 	bitNum = (SCREEN_WIDTH_PELS * row + col) % 8
-	print "byteNum is " + str(byteNum) + " bitNum is " + str(bitNum)
+	#print "byteNum is " + str(byteNum) + " bitNum is " + str(bitNum)
 	#Ok now we know which byte and which bit in that byte, we need to get that bit
 	byteData = screenData[byteNum];
-	print "-------------- byte data is " + str(byteData)
+	#print "-------------- byte data is " + str(byteData)
 	
 	if ((byteData & (1<<bitNum)) > 0):
 		return 1
@@ -80,7 +86,7 @@ def getScreenVal(coord, screenData):
 		return 0
 	
 
-def init_star():
+def init_pel():
     "creates new star values"
     dir = random.randrange(100000)
     velmult = random.random()*.6+.4
@@ -88,53 +94,55 @@ def init_star():
     return vel, WINCENTER[:]
 
 
-def initialize_stars():
+def initialize_pels():
     "creates a new starfield"
-    stars = []
-    for x in range(NUMSTARS):
-        star = init_star()
-        vel, pos = star
-        steps = random.randint(0, WINCENTER[0])
-        pos[0] = pos[0] + (vel[0] * steps)
-        pos[1] = pos[1] + (vel[1] * steps)
-        vel[0] = vel[0] * (steps * .09)
-        vel[1] = vel[1] * (steps * .09)
-        stars.append(star)
-    move_stars(stars)
-    return stars
-  
+    
 
-def draw_stars(surface, stars, color):
-    "used to draw (and clear) the stars"
-    for vel, pos in stars:
-        pos = (int(pos[0]), int(pos[1]))
-        surface.set_at(pos, color)
-
+def clear_display(surface):
+	color = [255,255,255]
+	
+	"used to draw (and clear) the display"
+      
+	for col in range(512):
+		for row in range(256):
+			surface.set_at((row, col), color)
 		
-def draw_display(surface, pels, color):
-    "used to draw (and clear) the display"
-    for vel, pos in stars:
-        pos = (int(pos[0]), int(pos[1]))
-        surface.set_at(pos, color)
+	
+	
+def draw_display(surface):
+	color = [0,0,0]
+	
+	"used to draw (and clear) the display"
+      
+	for col in range(512):
+		for row in range(256):
+			color[0] = 255*SCREEN[row,col]
+			color[1] = 0
+			color[2] = 0
+			surface.set_at((col, row), color)
+		
 
-
-def move_stars(stars):
-    "animate the star values"
-    for vel, pos in stars:
-        pos[0] = pos[0] + vel[0]
-        pos[1] = pos[1] + vel[1]
-        if not 0 <= pos[0] <= WINSIZE[0] or not 0 <= pos[1] <= WINSIZE[1]:
-            vel[:], pos[:] = init_star()
-        else:
-            vel[0] = vel[0] * 1.05
-            vel[1] = vel[1] * 1.05
+def update_pels(pels):
+	"Read in the next screen of data"
+	
+	
+	#Read raw file data
+	rawScreenData = readNlines(16384, infile)
+	#Convert raw file data to pels  - pos is x and y, vel[0] is color
+	#Want to represent pels on screen = need a 2D array - each element is a color, its r-c coords are x y vals
+	for col in range(512):
+		for row in range(256):
+			SCREEN[row,col] = getScreenVal((row,col), rawScreenData)
+	
+	#print SCREEN
+	
   
 
 def main():
     "This is the starfield code"
     #create our starfield
     random.seed()
-    stars = initialize_stars()
+    pels = initialize_pels()
     clock = pygame.time.Clock()
     #initialize and prepare screen
     pygame.init()
@@ -148,24 +156,34 @@ def main():
     #main game loop
     done = 0
     while not done:
-        #draw_stars(screen, stars, black) # Overwrite previously drawn star with black to make it disappear
-        #move_stars(stars)
-		draw_display(screen, pels, black)
-		update_(pels)
-        #draw_stars(screen, stars, white) # Redraw star in new position
-		draw_display(screen, pels, white)
-        pygame.display.update()
-        for e in pygame.event.get():
-            if e.type == QUIT or (e.type == KEYUP and e.key == K_ESCAPE):
-                done = 1
-                break
-            elif e.type == MOUSEBUTTONDOWN and e.button == 1:
-                WINCENTER[:] = list(e.pos)
-        clock.tick(50)
-
+        #draw_pels(screen, pels, black) # Overwrite previously drawn star with black to make it disappear
+        #move_pels(pels)
+		print 'Drawing display...\n'
+		draw_display(screen)
+		print 'Updating pels...\n'
+		update_pels(pels)
+		print 'pygame display update\n'
+        #draw_pels(screen, pels, white) # Redraw star in new position
+		pygame.display.update()
+		print 'sleeeeeping....'
+		time.sleep(1)
+		print 'wakey!'
+		#clear_display(screen)
+		pygame.display.update()
+		print 'press enter...\n'
+		a = raw_input()
+		
+		for e in pygame.event.get():
+		
+			if e.type == QUIT or (e.type == KEYUP and e.key == K_ESCAPE):
+				done = 1
+				break
+			elif e.type == MOUSEBUTTONDOWN and e.button == 1:
+				WINCENTER[:] = list(e.pos)
+		clock.tick(50)
 
 # if python says run, then we should run
 if __name__ == '__main__':
-    main()
-
+	main()
+	infile.close()
 

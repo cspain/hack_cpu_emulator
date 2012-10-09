@@ -1,3 +1,15 @@
+import random, math, pygame
+from pygame.locals import *
+
+#constants
+WINSIZE = [512, 256]
+WINCENTER = [320, 240]
+NUMSTARS = 9900
+SCREEN_SIZE_BYTES = WINSIZE[0]*WINSIZE[1]/8
+SCREEN_WIDTH_PELS = WINSIZE[0]
+
+
+
 
 SCREEN_SIZE_BYTES = 1024
 SCREEN_WIDTH_PELS = 40
@@ -68,6 +80,18 @@ print bitVal
 
 
 raw_input("PRESS ENTER TO QUIT")
+
+
+# THIS WILL BE THE MAIN LOOP AND ENTRY POINT
+def main():
+    
+
+
+
+# if python says run, then we should run
+if __name__ == '__main__':
+    main()
+
 
 
 
