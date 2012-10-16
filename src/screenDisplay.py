@@ -5,16 +5,10 @@
 #Step 1: Add a reader function to get in the data
 #Step 2: Try displaying the first page
 #NOTE: probably should only read in a few frames at a time into a buffer
-# 		otherwise we might be trying to hold on to MB of screen data uneccessarily.
+#         otherwise we might be trying to hold on to MB of screen data uneccessarily.
 
 
-"""A simple starfield example. Note you can move the 'center' of
-the starfield by leftclicking in the window. This example show
-the basics of creating a window, simple pixel plotting, and input
-event management"""
-
-
-import random, math, pygame
+import random, math, pygame, os, sys
 from pygame.locals import *
 from numpy  import *
 import time
@@ -26,23 +20,23 @@ NUMPELS = 9900
 SCREEN_SIZE_BYTES = WINSIZE[0]*WINSIZE[1]/8
 SCREEN_WIDTH_PELS = WINSIZE[0]
 infile = open('C:\Users\Chris2.chris-HP-Select\Documents\GitHub\hack_cpu_emulator\screenDump.txt','r')
-SCREEN = zeros((256, 512))
+SCREEN = zeros((WINSIZE[1], WINSIZE[0]))
 
 #############################
 # Read in n lines from a file
 #############################
 def readNlines(numLines, fileToRead):
-	readInLines = []
-	for i in range(numLines):
-		value = fileToRead.readline()
-		if value == '':
-			print 'ERROR EOF? ' + str(i)
-			break
-		
-		readInLines.append(int(value))
-	
-	
-	return readInLines
+    readInLines = []
+    for i in range(numLines):
+        value = fileToRead.readline()
+        if value == '':
+            print 'ERROR EOF? ' + str(i)
+            break
+        
+        readInLines.append(int(value))
+    #readInLines = map(int, fileToRead.readlines())
+    
+    return readInLines
 
 #######################################
 # Get value of the given screen coord
@@ -67,24 +61,24 @@ def readNlines(numLines, fileToRead):
 ####################################### (1,31) = 0 and is in row 1, byte 3
 
 def getScreenVal(coord, screenData):
-	#print "INSIDE getScreenVAL"
-	#First get the row
-	row = coord[0]
-	#Now col
-	col = coord[1]
-	#Get the correct byte out
-	byteNum = (SCREEN_WIDTH_PELS * row + col)/8
-	bitNum = (SCREEN_WIDTH_PELS * row + col) % 8
-	#print "byteNum is " + str(byteNum) + " bitNum is " + str(bitNum)
-	#Ok now we know which byte and which bit in that byte, we need to get that bit
-	byteData = screenData[byteNum];
-	#print "-------------- byte data is " + str(byteData)
-	
-	if ((byteData & (1<<bitNum)) > 0):
-		return 1
-	else:
-		return 0
-	
+    #print "INSIDE getScreenVAL"
+    #First get the row
+    row = coord[0]
+    #Now col
+    col = coord[1]
+    #Get the correct byte out
+    byteNum = (SCREEN_WIDTH_PELS * row + col)/8
+    bitNum = (SCREEN_WIDTH_PELS * row + col) % 8
+    bitNum = 7 - bitNum
+    #print "byteNum is " + str(byteNum) + " bitNum is " + str(bitNum)
+    #Ok now we know which byte and which bit in that byte, we need to get that bit
+    byteData = screenData[byteNum];
+    
+    if ((byteData & (1<<bitNum)) > 0):
+        return 1
+    else:
+        return 0
+    
 
 def init_pel():
     "creates new star values"
@@ -99,43 +93,54 @@ def initialize_pels():
     
 
 def clear_display(surface):
-	color = [255,255,255]
-	
-	"used to draw (and clear) the display"
+    color = [255,255,255]
+    
+    "used to draw (and clear) the display"
       
-	for col in range(512):
-		for row in range(256):
-			surface.set_at((row, col), color)
-		
-	
-	
+    for col in range(512):
+        for row in range(256):
+            surface.set_at((row, col), color)
+        
+    
+def manual_display(x,y,val,surface):
+    color = [0,0,0]
+    
+    "used to draw (and clear) the display"
+      
+    color[0] = val
+    color[1] = 0
+    color[2] = 0
+    surface.set_at((x, y), color)
+        
+    
 def draw_display(surface):
-	color = [0,0,0]
-	
-	"used to draw (and clear) the display"
+    color = [0,0,0]
+    
+    "used to draw (and clear) the display"
       
-	for col in range(512):
-		for row in range(256):
-			color[0] = 255*SCREEN[row,col]
-			color[1] = 0
-			color[2] = 0
-			surface.set_at((col, row), color)
-		
+    for col in range(512):
+        for row in range(256):
+            color[0] = 255*SCREEN[row,col]
+            color[1] = 0
+            color[2] = 0
+            surface.set_at((col, row), color)
+        
 
 def update_pels(pels):
-	"Read in the next screen of data"
-	
-	
-	#Read raw file data
-	rawScreenData = readNlines(16384, infile)
-	#Convert raw file data to pels  - pos is x and y, vel[0] is color
-	#Want to represent pels on screen = need a 2D array - each element is a color, its r-c coords are x y vals
-	for col in range(512):
-		for row in range(256):
-			SCREEN[row,col] = getScreenVal((row,col), rawScreenData)
-	
-	#print SCREEN
-	
+    "Read in the next screen of data"
+    
+    
+    #Read raw file data
+    rawScreenData = readNlines(16384, infile)
+  
+    #Convert raw file data to pels  - pos is x and y, vel[0] is color
+    #Want to represent pels on screen = need a 2D array - each element is a color, its r-c coords are x y vals
+    for col in range(512):
+        for row in range(256):
+            SCREEN[row,col] = getScreenVal((row,col), rawScreenData)
+    
+    #print SCREEN
+    
   
 
 def main():
@@ -153,37 +158,42 @@ def main():
     red = [200, 10, 10]
     screen.fill(black)
 
+    
     #main game loop
     done = 0
     while not done:
         #draw_pels(screen, pels, black) # Overwrite previously drawn star with black to make it disappear
         #move_pels(pels)
-		print 'Drawing display...\n'
-		draw_display(screen)
-		print 'Updating pels...\n'
-		update_pels(pels)
-		print 'pygame display update\n'
+        print 'Drawing display...\n'
+        #print 'Enter vals'
+        #inp = raw_input().split(',')
+        draw_display(screen)
+        #manual_display(int(inp[0]),int(inp[1]),int(inp[2]),screen)
+        print 'Updating pels...\n'
+        update_pels(pels)
+       
+        #print 'pygame display update\n'
         #draw_pels(screen, pels, white) # Redraw star in new position
-		pygame.display.update()
-		print 'sleeeeeping....'
-		time.sleep(1)
-		print 'wakey!'
-		#clear_display(screen)
-		pygame.display.update()
-		print 'press enter...\n'
-		a = raw_input()
-		
-		for e in pygame.event.get():
-		
-			if e.type == QUIT or (e.type == KEYUP and e.key == K_ESCAPE):
-				done = 1
-				break
-			elif e.type == MOUSEBUTTONDOWN and e.button == 1:
-				WINCENTER[:] = list(e.pos)
-		clock.tick(50)
+        #pygame.display.update()
+        #print 'sleeeeeping....'
+        #time.sleep(1)
+        print 'wakey!'
+        #clear_display(screen)
+        pygame.display.update()
+        print 'press enter...\n'
+        a = raw_input()
+        
+        for e in pygame.event.get():
+        
+            if e.type == QUIT or (e.type == KEYUP and e.key == K_ESCAPE):
+                done = 1
+                break
+            elif e.type == MOUSEBUTTONDOWN and e.button == 1:
+                WINCENTER[:] = list(e.pos)
+        clock.tick(50)
 
 # if python says run, then we should run
 if __name__ == '__main__':
-	main()
-	infile.close()
+    main()
+    infile.close()
 
