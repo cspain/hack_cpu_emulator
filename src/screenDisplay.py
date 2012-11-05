@@ -19,7 +19,13 @@ WINCENTER = [320, 240]
 NUMPELS = 9900
 SCREEN_SIZE_BYTES = WINSIZE[0]*WINSIZE[1]/8
 SCREEN_WIDTH_PELS = WINSIZE[0]
-infile = open('C:\Users\Chris2.chris-HP-Select\Documents\GitHub\hack_cpu_emulator\screenDump.txt','r')
+
+try:
+    infile = open('C:\Users\Chris2.chris-HP-Select\Documents\GitHub\hack_cpu_emulator\screenDump.txt','r')
+except IOError:
+    print 'error opening file'
+    sys.exit(1)
+    
 SCREEN = zeros((WINSIZE[1], WINSIZE[0]))
 
 #############################
@@ -152,7 +158,7 @@ def main():
     #initialize and prepare screen
     pygame.init()
     screen = pygame.display.set_mode(WINSIZE)
-    pygame.display.set_caption('pygame Stars Example')
+    pygame.display.set_caption('Hack CPU Emulator Screen Output')
     white = 255, 0, 200
     black = 10, 10, 10
     red = [200, 10, 10]
@@ -164,12 +170,12 @@ def main():
     while not done:
         #draw_pels(screen, pels, black) # Overwrite previously drawn star with black to make it disappear
         #move_pels(pels)
-        print 'Drawing display...\n'
+        #print 'Drawing display...\n'
         #print 'Enter vals'
         #inp = raw_input().split(',')
         draw_display(screen)
         #manual_display(int(inp[0]),int(inp[1]),int(inp[2]),screen)
-        print 'Updating pels...\n'
+        #print 'Updating pels...\n'
         update_pels(pels)
        
         #print 'pygame display update\n'
@@ -177,11 +183,11 @@ def main():
         #pygame.display.update()
         #print 'sleeeeeping....'
         #time.sleep(1)
-        print 'wakey!'
+        #print 'wakey!'
         #clear_display(screen)
         pygame.display.update()
-        print 'press enter...\n'
-        a = raw_input()
+        #print 'press enter...\n'
+        #a = raw_input()
         
         for e in pygame.event.get():
         
@@ -190,7 +196,7 @@ def main():
                 break
             elif e.type == MOUSEBUTTONDOWN and e.button == 1:
                 WINCENTER[:] = list(e.pos)
-        clock.tick(50)
+        clock.tick(5)
 
 # if python says run, then we should run
 if __name__ == '__main__':

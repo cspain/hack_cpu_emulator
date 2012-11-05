@@ -11,7 +11,6 @@
 
 #include <stdio.h>
 
-
 /*
 filename:      The file to dump/append data to
 RAM:           Pointer to the main system RAM structure
@@ -39,10 +38,8 @@ int screenMemDump(char *fileName, unsigned char *RAM, unsigned int screenStart, 
 
    for (offset= screenStart; offset < screenStart + screenSize; offset++)
    {
-
       //printf("SCREEN %d\n",*(RAM+offset));
       fprintf(fp,"%d\n",*(RAM+offset));
-
    }
    fclose(fp);
     return 0;
