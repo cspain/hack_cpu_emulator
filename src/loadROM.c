@@ -38,8 +38,9 @@ int readHackFile(unsigned char *ROM)
     unsigned char lowByte;
     char tempBuffer[50];
     FILE *fp;
-    fp = fopen("src/testReadHack.hack","r");
-
+    //fp = fopen("debug_test.hack","r");
+    fp = fopen("lineDraw.hack","r");
+    //fp = fopen("testReadHack.hack","r");
     if (!fp)
     {
         printf("ERROR: FAILED TO OPEN FILE\n");

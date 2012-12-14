@@ -21,7 +21,7 @@ SCREEN_SIZE_BYTES = WINSIZE[0]*WINSIZE[1]/8
 SCREEN_WIDTH_PELS = WINSIZE[0]
 
 try:
-    infile = open('C:\Users\Chris2.chris-HP-Select\Documents\GitHub\hack_cpu_emulator\screenDump.txt','r')
+    infile = open('screenDump.txt','r')
 except IOError:
     print 'error opening file'
     sys.exit(1)
@@ -160,7 +160,7 @@ def main():
     screen = pygame.display.set_mode(WINSIZE)
     pygame.display.set_caption('Hack CPU Emulator Screen Output')
     white = 255, 0, 200
-    black = 10, 10, 10
+    black = 0, 0, 0
     red = [200, 10, 10]
     screen.fill(black)
 

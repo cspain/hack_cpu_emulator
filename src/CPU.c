@@ -5,14 +5,15 @@
 
 #define DEBUG 1
 #define DEBUG_REGS 1
-#define OPCODE_OFFSET 0x0 // not all opcodes are used so we need an offset into the valid ones
+#define OPCODE_OFFSET 0x0 // not all opcodes are used so we may need an offset into the valid ones
 #define MAX_OP 0x400 + 0xFF// Number of possible opcodes
 #define NUM_EXEC 65535 // Limit the number of executions (only for debug)
 #define SCREEN 0x4000 // Screen mapped to this address
 #define SCREEN_SIZE 0x2000 // Size of screen map
 #define KBD 0x6000 // Keyboard mapped to this address
+#define INST 0x6001 // Start of instructions 
 
-#define DUMP_SCREEN_MEM 1//Turn on or off the screen memory dump
+#define DUMP_SCREEN_MEM 1 //Turn on or off the screen memory dump
 
 #define F_ZERO       (1 << 0)
 #define F_CARRY      (1 << 1)
@@ -23,6 +24,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#include <stdlib.h>
 
 #include "hack_instruction_set.h"
 
@@ -41,9 +43,10 @@
 
 void execute(void);
 extern int readHackFile(unsigned char *ROM);
+extern int screenMemDump(char *fileName, unsigned char *RAM, unsigned int screenStart, unsigned int screenSize);
 
 //extern int readHackFile(unsigned *char ROM);
-unsigned char RAM[0xFFFF];
+unsigned char RAM[0xFFFFF];
 //char RAM[0xFFFF ] = {0};
 /*
 unsigned char RAM[0xFFFF] = {0x02, 0xE3, 0x6, 0x5, 0x21, 0xFF, 0x9F, 0x32, 0xCB, 0x7C, 0x20, 0xFB, 0x21, 0x26, 0xFF, 0x0E,
@@ -178,21 +181,21 @@ void writeByte (unsigned int address, unsigned char value)
 {
     int mask = 0xFFFF; // todo: set the correct mask
 
-    assert(address < 0xFFFF);
+    assert(address < 0xFFFFF);
 
     address &= mask;
 
     /* make sure we don't try and write to ROM */
-    if (address < ROM_END)
+    if (0 && address < ROM_END)
     {
         printf("writeByte ERROR: ATTEMPTING TO WRITE TO READ ONLY ROM\n");
         //return;
     }
 
-    if (address > RAM_END)
+    if (address >= INST)
     {
-        printf("writeByte ERROR: ATTEMPTING TO WRITE PAST MAPPED MEMORY RANGE\n");
-        //return;
+       printf("writeByte ERROR: ATTEMPTING TO WRITE %x OVER CODE SECTION AT %x\n",value, address);
+       // exit(1);
     }
 
     /* Now write the data to the RAM */
@@ -219,8 +222,8 @@ char readByte (int address)
     /* don't care if we're reading from ROM or RAM, just make sure we're in range */
     if (address > RAM_END)
     {
-        printf("readByte ERROR: ATTEMPTING TO READ OUTSIDE RANGE\n");
-        return -1;
+       printf("readByte ERROR: ATTEMPTING TO READ AT %x OUTSIDE RANGE\n",address);
+        //return -1;
     }
 
     DBG("reading byte from address %1x, returning %1x\n",address,(unsigned)RAM[address]);
@@ -289,8 +292,22 @@ void NOP()
 
 void LOAD_A()
 {
+
+   static int counter = 0;
     cpu._r.a = MMU.rw(cpu._r.pc);    //:A = number
+
     DBGREG("--------->LOADING regA with %x ************\n",cpu._r.a);
+
+    if (cpu._r.a >= SCREEN)
+    {
+       printf("LOADED SCREEN ADDRESS!\n");
+       counter++;
+       
+       //if (counter > 100)
+          // exit(0);
+    }
+
+   
 }
 void SET_M_zero()
 {
@@ -433,7 +450,9 @@ void IDT_D()
 }
 void MOV_D_A()
 {
+  
     cpu._r.d = cpu._r.a;    //:D = A
+    printf("-++++++++++++//////////->MOV_D_A: %d\n", cpu._r.d);
     DBGREG("LOADING D: cpu._r.d = %x\n", cpu._r.d);
 }
 void INV_D()
@@ -1492,6 +1511,7 @@ void initCPU()
     memset(&cpu._r, 0x00, sizeof(cpu._r));    // Clear registers
 
     cpu._clock = 0;                        // Zero timer
+    cpu._r.pc = INST;                       // Point program counter at code section
     cpu.reset = resetCPU;                  // Set up reset function
     cpu.execute = execute;                 // Set up execute function
 
@@ -1525,6 +1545,7 @@ void execute(void)
     /* Get the instruction from the ROM */
     unsigned int opcode = MMU.rw(cpu._r.pc);
 
+   
 
 
     /* need to decode A vs C instructions...not sure if this is the best place
@@ -1553,7 +1574,15 @@ void execute(void)
     }
     /* ************ACTUALLY CALCULATE OUTPUT BY RUNNING CPU  ************** */
 
-    printf("PC: %d\n",cpu._r.pc/2);
+    printf("PC: %x\n",cpu._r.pc - INST);
+
+    if (cpu._r.pc < INST) 
+    {
+       printf("ERROR: PC POINTING TO DATA SEGMENT\n");
+       exit(1);
+    }
+
+
     DBG("****************executing instruction\n");
     //DBG("SIZEOF CPU MAP %d, contents of [0x300] %x, of [0x8] %x [0xA] %x\n",sizeof(cpu.map), cpu.map[0x300], cpu.map[0x8], cpu.map[0xA]);
 
@@ -1606,7 +1635,7 @@ void execute(void)
         case 1:
             if (comp > 0)
             {
-                cpu._r.pc = 2*cpu._r.a;    // Program Counter set to Address register value for jump
+                cpu._r.pc = INST + 2*cpu._r.a;    // Program Counter set to Address register value for jump
                 printf("JUMPING > 0, A is %d\n", cpu._r.a);
             }
             else
@@ -1618,7 +1647,7 @@ void execute(void)
             printf("Checking if eq zero jump");
             if (comp == 0)
             {
-                cpu._r.pc = 2*cpu._r.a;
+                cpu._r.pc = INST + 2*cpu._r.a;
                 printf("!!JUMPING == 0, A is %d\n", cpu._r.a);
             }
             else
@@ -1629,7 +1658,7 @@ void execute(void)
         case 3:
             if (comp >= 0)
             {
-                cpu._r.pc = 2*cpu._r.a;
+                cpu._r.pc = INST + 2*cpu._r.a;
                 printf("JUMPING >= 0, A is %d\n", cpu._r.a);
             }
             else
@@ -1640,7 +1669,7 @@ void execute(void)
         case 4:
             if (comp < 0)
             {
-                cpu._r.pc = 2*cpu._r.a;
+                cpu._r.pc = INST + 2*cpu._r.a;
                 DBG("JUMPING < 0, A is %d\n", cpu._r.a);
             }
             else
@@ -1651,7 +1680,7 @@ void execute(void)
         case 5:
             if (comp != 0)
             {
-                cpu._r.pc = 2*cpu._r.a;
+                cpu._r.pc = INST + 2*cpu._r.a;
                 DBG("JUMPING != 0, A is %d\n", cpu._r.a);
             }
             else
@@ -1663,7 +1692,7 @@ void execute(void)
             if (comp <= 0)
             {
                 DBG("JUMPING <= 0, A is %d\n", cpu._r.a);
-                cpu._r.pc = 2*cpu._r.a;
+                cpu._r.pc = INST + 2*cpu._r.a;
             }
             else
             {
@@ -1674,8 +1703,8 @@ void execute(void)
             if (1)
             {
                 DBG("JUMPING ALWAYS, A is %d\n", cpu._r.a);
-                cpu._r.pc = 2*cpu._r.a;    // Always jump
-                DBG("NOW PC HAS BEEN SET TO (DEC) %d\n", cpu._r.pc);
+                cpu._r.pc = INST + 2*cpu._r.a;    // Always jump
+                DBG("NOW PC HAS BEEN SET TO (DEC) %d\n", cpu._r.pc - INST);
             }
             else
             {
@@ -1698,6 +1727,11 @@ void execute(void)
         cpu._r.pc += 2; // Update Program Counter here
         /* ******************************************************************** */
 
+    }
+
+    if (0 && cpu._r.pc > INST+24){
+       printf("RAM[255]=%d, RAM[1]=%d\n",RAM[255],RAM[1]);
+       exit(0);
     }
 
     printf("XXXXXXXXXXXXXXXXXXXXXXXXX\n");
@@ -1724,31 +1758,35 @@ int main()
     int i = 0;
     int rc = 0;
 
-    memset(RAM+0x5000,0xFF,sizeof(RAM)-0x5000);
+    // memset screen for test
+    memset(RAM+SCREEN,0x00,SCREEN_SIZE);
 
     printf("!!!!!!!!!Loading Program ROM...\n");
-    rc = readHackFile(RAM);
+    rc = readHackFile(RAM+INST);
     if (rc < 0)
     {
         printf("ERROR LOADING ROM\n");
         return rc;
     }
 
+    printf("calling CPU reset...\n");
+    //cpu.reset();    // Clear all the registers
     printf("calling CPU init...\n");
     initCPU();      // Set up the CPU
-    printf("calling CPU reset...\n");
-    cpu.reset();    // Clear all the registers
+   
     printf("calling MMU init...\n");
     initMMU();
 
     /* Run the CPU! */
     // for(;;)
+
+    RAM[KBD] = 0;
     printf("Running Main Loop...\n");
     for(i=0; i< NUM_EXEC; i++)
     {
         cpu.execute();
 
-        RAM[KBD] = i%256;
+        RAM[KBD] = ~RAM[KBD] ;
 
         if (DUMP_SCREEN_MEM)
         {
